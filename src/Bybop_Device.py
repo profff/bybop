@@ -233,10 +233,10 @@ class Device(object):
         - verbose : Set verbose mode (prints sent/received commands)
         """
         self._verbose = verbose
-        inb = [i for i in (ackBuffer, nackBuffer, urgBuffer) if i > 0]
-        outb = cmdBuffers
+        self._inb = [i for i in (ackBuffer, nackBuffer, urgBuffer) if i > 0]
+        self._outb = cmdBuffers
         self._network = Bybop_Network.Network(ip, c2d_port, d2c_port,
-                                              inb, outb, self)
+                                              self._inb, self._outb, self)
         self._ackBuffer = ackBuffer
         self._nackBuffer = nackBuffer
         self._urgBuffer = urgBuffer
@@ -245,6 +245,7 @@ class Device(object):
         if not skipCommonInit:
             self._common_init_product()
         self._init_product()
+        self._connected=True
 
     def data_received(self, buf, data):
         """
@@ -290,7 +291,23 @@ class Device(object):
         """
         print('Product disconnected !')
         self.stop()
+        self._connected=False
 
+    def try_reconnect(self):
+        self._network = Bybop_Network.Network(ip, c2d_port, d2c_port,
+                                              self._inb, self._outb, self)
+        self._ackBuffer = ackBuffer
+        self._nackBuffer = nackBuffer
+        self._urgBuffer = urgBuffer
+        self._cmdBuffers = cmdBuffers
+        self._state = State()
+        if not skipCommonInit:
+            self._common_init_product()
+        self._init_product()
+        
+    def is_connected(self):
+        return self._connected
+    
     def get_state(self, copy=True):
         """
         Get the product state.
@@ -319,7 +336,7 @@ class Device(object):
                 'common.CommonState.BatteryStateChanged')['percent']
         except KeyError:
             return 0
-
+        
     def send_data(self, name, *args, **kwargs):
         """
         Send some command to the product.
@@ -410,6 +427,7 @@ class Device(object):
         self._verbose = verbose
 
 
+
 class BebopDrone(Device):
     def __init__(self, ip, c2d_port, d2c_port):
         """
@@ -463,6 +481,51 @@ class BebopDrone(Device):
         """
         self.send_data('ardrone3.MediaStreaming.VideoEnable', 0)
 
+    def get_attitude(self):
+        try:
+            return self._state.get_value('ardrone3.PilotingState.AttitudeChanged')
+        except KeyError:
+            return 0
+
+    def get_altitude(self):
+        try:
+            return self._state.get_value('ardrone3.PilotingState.AltitudeChanged')
+        except KeyError:
+            return 0
+
+    def get_airspeed(self):
+        try:
+            return self._state.get_value('ardrone3.PilotingState.AirSpeedChanged')
+        except KeyError:
+            return 0
+
+    def get_geoposition(self):
+        try:
+            return self._state.get_value('ardrone3.PilotingState.PositionChanged')
+        except KeyError:
+            return 0
+    def get_speeds(self):
+        try:
+            return self._state.get_value('ardrone3.PilotingState.SpeedChanged')
+        except KeyError:
+            return 0
+    
+    def get_flystatus(self):
+        try:
+            return self._state.get_value('ardrone3.PilotingState.FlyingStateChanged')
+        except KeyError:
+            return 0
+        
+    def set_PCMD(self,pitch,roll,yaw,gaz):
+        self.send_data('ardrone3.Piloting.PCMD',1,roll,pitch,yaw,gaz)
+
+    def RTH(self):
+        self.send_data('ardrone3.Piloting.NavigateHome',1)
+
+    def CancelRTH(self):
+        self.send_data('ardrone3.Piloting.NavigateHome',0)
+        
+    
 
 class Anafi(Device):
     def __init__(self, ip, c2d_port, d2c_port):

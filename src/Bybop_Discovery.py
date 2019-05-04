@@ -4,7 +4,7 @@
 from zeroconf import ServiceBrowser, Zeroconf
 import socket
 import threading
-
+import time
 
 class DeviceID(object):
     # Drones
@@ -70,24 +70,29 @@ class Discovery(object):
         Arguments:
         - deviceId : List of deviceIds (strings) to search.
         """
-        self._zeroconf = Zeroconf()
+        self._deviceId=deviceId
+        self._zeroconf = None
         self._browser = []
         self._services = {}
-        self._lock = threading.RLock()
-        self._cond = threading.Condition(self._lock)
-        for did in deviceId:
-            self._browser.append(ServiceBrowser(self._zeroconf, '_arsdk-' +
-                                                str(did) + '._udp.local.',
-                                                self))
 
+    def start(self):
+        self._start=time.time()
+        self._zeroconf=Zeroconf()
+        self._browser = []
+        self._services = {}
+        for did in self._deviceId:
+            b='_arsdk-' + str(did) + '._udp.local.'
+            s=ServiceBrowser(self._zeroconf,b,self)
+            self._browser.append(s)
+           
     def stop(self):
         """
         Stop searching.
 
         When stopped, this object can not be restarted
         """
-        with self._lock:
-            self._cond.notify_all()
+        # with self._lock:
+        #     self._cond.notify_all()
         self._zeroconf.close()
 
     def get_devices(self):
@@ -101,12 +106,10 @@ class Discovery(object):
         Keyword arguments:
         - timeout : Timeout in floating point seconds for the operation
         """
-        with self._lock:
-            self._cond.wait(timeout)
-
-    def _signal_change(self):
-        with self._lock:
-            self._cond.notify_all()
+        # with self._lock:
+        #     self._cond.wait(timeout)
+        while(time.time()-self._start<timeout):
+            time.sleep(1)
 
     def remove_service(self, zeroconf, type, name):
         """ Internal function for zeroconf.ServiceBrowser. """
@@ -117,13 +120,17 @@ class Discovery(object):
     def add_service(self, zeroconf, type, name):
         """ Internal function for zeroconf.ServiceBrowser. """
         info = zeroconf.get_service_info(type, name)
+        # print("/////////////////////////////////////////")
+        # print(name)
+        # print(info)
         if info is not None:
-            self._services[name] = info
-            self._signal_change()
+            n=name[0:-(len(type) + 1)]
+            self._services[n] = info
+#            self._signal_change()
         else:
             print('Found a service witout info : ' + name + '. Stopping !')
             self.stop()
-
+        return info
 
 def get_name(device):
     """ Get the display name of a device """
