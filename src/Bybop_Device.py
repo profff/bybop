@@ -468,6 +468,10 @@ class BebopDrone(Device):
         """
         self.send_data('ardrone3.Piloting.Emergency')
 
+    def circle(self):
+        self.send_data('ardrone3.Piloting.Circle',2)
+
+
     def start_streaming(self):
         """
         Starts the video streaming (it can be recieved by an external RTP
@@ -495,11 +499,16 @@ class BebopDrone(Device):
 
     def get_airspeed(self):
         try:
-            return self._state.get_value('ardrone3.PilotingState.AirSpeedChanged')
+            return self._state.get_value('ardrone3.PilotingState.AirSpeedChanged')['airSpeed']
         except KeyError:
             return 0
 
     def get_geoposition(self):
+        try:
+            return self._state.get_value('ardrone3.PilotingState.PositionChanged')
+        except KeyError:
+            return 0
+    def get_homeposition(self):
         try:
             return self._state.get_value('ardrone3.PilotingState.PositionChanged')
         except KeyError:
@@ -515,15 +524,30 @@ class BebopDrone(Device):
             return self._state.get_value('ardrone3.PilotingState.FlyingStateChanged')
         except KeyError:
             return 0
+    def get_RTHType(self):
+        try:
+            return self._state.get_value('ardrone3.GPSSettingsState.HomeTypeChanged')['type']
+        except KeyError:
+            return 0
+    def get_HomePos(self):
+        try:
+            return self._state.get_value('ardrone3.GPSSettingsState.HomeChanged')
+        except KeyError:
+            return 0
         
-    def set_PCMD(self,pitch,roll,yaw,gaz):
-        self.send_data('ardrone3.Piloting.PCMD',1,roll,pitch,yaw,gaz)
+    def set_PCMD(self,pitch,roll,yaw,gaz,timestamp):
+        self.send_data('ardrone3.Piloting.PCMD',1,roll,pitch,yaw,gaz,timestamp)
 
     def RTH(self):
         self.send_data('ardrone3.Piloting.NavigateHome',1)
 
     def CancelRTH(self):
         self.send_data('ardrone3.Piloting.NavigateHome',0)
+
+    def set_homeposition(self,lat,lon,alt):
+        self.send_data('ardrone3.GPSSettings.SetHome',lat,lon,alt)
+    def reset_homeposition(self):
+        self.send_data('ardrone3.GPSSettings.ResetHome')
         
     
 
